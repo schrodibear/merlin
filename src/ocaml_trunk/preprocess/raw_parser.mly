@@ -540,6 +540,7 @@ let fake_vb_app f vb = {vb with pvb_expr = Fake.app f vb.pvb_expr}
 %token OUNIT_BENCH_FUN
 %token OUNIT_BENCH_INDEXED
 %token OUNIT_BENCH_MODULE
+%token SHARPSHARP
 %token NONREC
 
 %token ENTRYPOINT EXITPOINT
@@ -607,7 +608,7 @@ The precedences must be listed from low to high.
 %nonassoc prec_constant_constructor     (* cf. simple_expr (C versus C x) *)
 %nonassoc prec_constr_appl              (* above AS BAR COLONCOLON COMMA *)
 %nonassoc below_SHARP
-%nonassoc SHARP                         (* simple_expr/toplevel_directive *)
+%nonassoc SHARP SHARPSHARP              (* simple_expr/toplevel_directive *)
 %left     SHARPOP
 %nonassoc below_DOT
 %nonassoc DOT
@@ -2823,38 +2824,38 @@ expr:
 ;
 
 expr:
-| simple_expr SHARP SHARP label LESSMINUS expr
+| simple_expr SHARPSHARP label LESSMINUS expr
     { let inst = Fake.(app Js.un_js $1) in
-      let field = mkexp $startpos $endpos($4) (Pexp_send(inst, $4)) in
+      let field = mkexp $startpos $endpos($3) (Pexp_send(inst, $3)) in
       let prop = Fake.(app Js.un_prop field) in
-      let setter = mkexp $startpos $endpos($4) (Pexp_send(prop,"set")) in
+      let setter = mkexp $startpos $endpos($3) (Pexp_send(prop,"set")) in
       reloc_exp $startpos $endpos
-      Fake.(app setter $6)
+      Fake.(app setter $5)
     }
 ;
 
 simple_expr:
-| simple_expr SHARP SHARP @{`Shift_token (1,LIDENT "")} label
+| simple_expr SHARPSHARP @{`Shift_token (1,LIDENT "")} label
     { let inst = Fake.(app Js.un_js $1) in
-      let field = mkexp $startpos $endpos (Pexp_send(inst, $4)) in
+      let field = mkexp $startpos $endpos (Pexp_send(inst, $3)) in
       let prop = Fake.(app Js.un_prop field) in
       mkexp $startpos $endpos (Pexp_send(prop,"get"))
     }
-| simple_expr SHARP SHARP label LPAREN RPAREN
+| simple_expr SHARPSHARP label LPAREN RPAREN
     { let inst = Fake.(app Js.un_js $1) in
-      let jsmeth = mkexp $startpos $endpos($4) (Pexp_send(inst, $4)) in
+      let jsmeth = mkexp $startpos $endpos($3) (Pexp_send(inst, $3)) in
       Fake.(app Js.un_meth jsmeth)
     }
-| simple_expr SHARP SHARP label LPAREN expr_comma_opt_list RPAREN
+| simple_expr SHARPSHARP label LPAREN expr_comma_opt_list RPAREN
     { let inst = Fake.(app Js.un_js $1) in
-      let meth = mkexp $startpos $endpos($4) (Pexp_send(inst, $4)) in
+      let meth = mkexp $startpos $endpos($3) (Pexp_send(inst, $3)) in
       let jsmeth =
         List.fold_left
           (fun meth arg ->
             reloc_exp meth.pexp_loc.Location.loc_start
                       arg.pexp_loc.Location.loc_end
             (Fake.app meth arg))
-          meth (List.rev $6)
+          meth (List.rev $5)
       in
       Fake.(app Js.un_meth jsmeth)
     }
