@@ -1384,19 +1384,12 @@ loading"
         (find-file-other-window file)
       (message "No project file for the current buffer."))))
 
-(defun merlin-flags-clear ()
-  "Clear flags for the current project"
-  (interactive)
-  (let* ((r (merlin/send-command '(flags clear)))
-         (failed (assoc 'failures r)))
-    (when failed (message "%s" (cdr failed))))
-  (merlin-error-reset))
-
-(defun merlin-flags-add (flag-string)
-  "Set FLAG for the current project"
-  (interactive "sFlag to add: ")
+(defun merlin-flags-set (flag-string)
+  "Set user flags for current project."
+  (interactive (let ((flags (merlin/send-command '(flags get))))
+                 (list (read-string "Flags: " (mapconcat 'identity flags " ")))))
   (let* ((flag-list (split-string flag-string))
-         (r (merlin/send-command (list 'flags 'add flag-list)))
+         (r (merlin/send-command (list 'flags 'set flag-list)))
          (failed (assoc 'failures r)))
     (when failed (message "%s" (cdr failed))))
   (merlin-error-reset))
@@ -1694,12 +1687,9 @@ Returns the position."
     (define-key merlin-menu-map [dot-merlin]
       '(menu-item "dot-merlin check" merlin-project-check
                   :help "Display status of '.merlin'."))
-    (define-key merlin-menu-map [addflag]
-      '(menu-item "Add a flag" merlin-flags-add
-                  :help "Add a flag to be passed to ocamlmerlin after restarting it."))
-    (define-key merlin-menu-map [clearflag]
-      '(menu-item "Clear flags" merlin-flags-clear
-                  :help "Clear all flags set up to be passed to ocamlmerlin."))
+    (define-key merlin-menu-map [setflags]
+      '(menu-item "Set flags" merlin-flags-set
+                  :help "Set compiler flags for current project."))
     (define-key merlin-menu-map [restartmerlin]
       '(menu-item "Restart merlin" merlin-restart-process
                   :help "Restart merlin for the current buffer."))
