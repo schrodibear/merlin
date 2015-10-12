@@ -249,6 +249,12 @@ def command_document(path, line, col):
     except MerlinExc as e:
         try_print_error(e)
 
+def differs_from_current_file(path):
+    buf_path = vim.eval("expand('%:p')")
+    res_path = vim.eval("expand('%s:p')" % path)
+    return buf_path == res_path
+
+
 def command_locate(path, line, col):
     try:
         choice = vim.eval('g:merlin_locate_preference')
@@ -264,7 +270,7 @@ def command_locate(path, line, col):
             split_method = vim.eval('g:merlin_split_method')
             # save the current position in the jump list
             vim.command("normal! m'")
-            if "file" in pos_or_err:
+            if "file" in pos_or_err and differs_from_current_file(pos_or_err['file']):
                 if split_method == "never":
                     vim.command(":keepjumps e %s" % pos_or_err['file'])
                 elif "tab" in split_method:
