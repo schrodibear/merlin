@@ -43,8 +43,7 @@ let caught catch =
   caught
 
 type parsed = [ `Str of Parsetree.structure | `Sg of Parsetree.signature ]
-type typed  = [ `Str of Typedtree.structure | `Sg of Typedtree.signature
-              | `Fail of Env.t * Location.t ]
+type typed  = [ `Ok of Merlin_browse.t | `Fail of Env.t * Location.t ]
 type checks = Typecore.delayed_check list
 
 (* Intermediate, resumable type checking state *)
@@ -130,17 +129,24 @@ let fake_env node =
 let append catch loc step item =
   try
     Typecore.delayed_checks := [];
+    let rec cons env node = function
+      | [] -> `Ok (List.One (env, node))
+      | (_, `Ok path, _) :: _ -> `Ok (List.More ((env, node), path))
+      | (_, `Fail _, _) :: xs -> cons env node xs
+    in
     let env, contents =
       match item with
       | `str str ->
         let str',t,env = Typemod.type_structure step.env str loc in
         env,
-        (`Str str, `Str str', !Typecore.delayed_checks) :: step.contents
+        (`Str str, cons env (Browse_node.Structure str') step.contents,
+         !Typecore.delayed_checks) :: step.contents
       | `sg sg ->
         let sg' = Typemod.transl_signature step.env sg in
         let env = sg'.Typedtree.sig_final_env in
         env,
-        (`Sg sg, `Sg sg', !Typecore.delayed_checks) :: step.contents
+        (`Sg sg, cons env (Browse_node.Signature sg') step.contents,
+         !Typecore.delayed_checks) :: step.contents
       | `fake str ->
         let str',_,_ =
           Parsing_aux.catch_warnings (ref [])
@@ -148,7 +154,8 @@ let append catch loc step item =
         in
         let env = fake_env (Browse_node.Structure str') in
         env,
-        (`Str str, `Str str', !Typecore.delayed_checks) :: step.contents
+        (`Str str, cons env (Browse_node.Structure str') step.contents,
+         !Typecore.delayed_checks) :: step.contents
       | `none -> step.env, step.contents
     in
     let snapshot = Btype.snapshot () in
@@ -285,16 +292,19 @@ let delayed_checks t =
     List.fold_left ~f:(fun acc (_,typed,checks) ->
         try match typed with
           | `Fail _ -> acc
-          | `Str str ->
-            ignore (Includemod.signatures st.env
-                      str.Typedtree.str_type
-                      str.Typedtree.str_type : Typedtree.module_coercion);
-            checks @ acc
-          | `Sg sg ->
-            ignore (Includemod.signatures st.env
-                      sg.Typedtree.sig_type
-                      sg.Typedtree.sig_type : Typedtree.module_coercion);
-            checks @ acc
+          | `Ok path ->
+            match List.Non_empty.hd path with
+            | _, Browse_node.Structure str ->
+              ignore (Includemod.signatures st.env
+                        str.Typedtree.str_type
+                        str.Typedtree.str_type : Typedtree.module_coercion);
+              checks @ acc
+            | _, Browse_node.Signature sg ->
+              ignore (Includemod.signatures st.env
+                        sg.Typedtree.sig_type
+                        sg.Typedtree.sig_type : Typedtree.module_coercion);
+              checks @ acc
+            | _ -> acc
         with exn ->
           exns := exn :: !exns;
           acc
@@ -315,13 +325,9 @@ let is_valid t =
 let last_ident env = Raw_compat.last_ident (Env.summary env)
 
 let to_browse contents =
-  let with_env node =
-    List.One (Browse_node.node_update_env Env.empty node, node)
-  in
   let of_content (_,typed,_) = match typed with
     | `Fail _ -> None
-    | `Sg sg -> Some (with_env (Browse_node.Signature sg))
-    | `Str str -> Some (with_env (Browse_node.Structure str))
+    | `Ok browse -> Some browse
   in
   List.filter_map ~f:of_content contents
 

@@ -36,8 +36,7 @@ val update : Merlin_parser.t -> t -> t
 val env : t -> Env.t
 
 type parsed = [ `Str of Parsetree.structure | `Sg of Parsetree.signature ]
-type typed  = [ `Str of Typedtree.structure | `Sg of Typedtree.signature
-              | `Fail of Env.t * Location.t ]
+type typed  = [ `Ok of Merlin_browse.t | `Fail of Env.t * Location.t ]
 type checks = Typecore.delayed_check list
 
 val contents : t -> (parsed * typed * checks) list

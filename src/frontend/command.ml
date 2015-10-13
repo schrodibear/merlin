@@ -592,8 +592,12 @@ let dispatch_query ~verbosity buffer =
         match typed with
         | `Fail (_,loc) ->
           Format.fprintf ppf "<failed to type at %a>\n" Location.print loc
-        | `Sg sg -> Printtyped.interface ppf sg
-        |`Str str -> Printtyped.implementation ppf str
+        | `Ok path -> match List.Non_empty.hd path with
+          | _, Browse_node.Signature sg -> Printtyped.interface ppf sg
+          | _, Browse_node.Structure str -> Printtyped.implementation ppf str
+          | _, node ->
+            Format.fprintf ppf "<unknown node %s>\n"
+              (Browse_node.string_of_node node)
       ) (Typer.contents typer);
     `String (to_string ())
 
